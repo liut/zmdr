@@ -120,6 +120,8 @@
     }
     .markdown-body a { color: var(--link-color); text-decoration: none; }
     .markdown-body a:hover { text-decoration: underline; }
+    .ext-link { color: var(--link-color); text-decoration: none; cursor: pointer; }
+    .ext-link:hover { text-decoration: underline; }
     .markdown-body hr { border: none; border-top: 1px solid var(--border-color); margin: 24px 0; }
     .markdown-body img { max-width: 100%; }
     .markdown-body ul, .markdown-body ol { padding-left: 2em; margin-bottom: 16px; }
@@ -189,7 +191,7 @@
   </nav>
   <div class="content">
     <div id="content" class="markdown-body"></div>
-  </div>
+    </div>
   <div class="search-bar" id="searchBar" style="display:none;">
     <input type="text" id="searchInput" placeholder="Search..." />
     <span class="search-info" id="searchInfo">0/0</span>
@@ -205,17 +207,24 @@
     let matches = [];
     let currentIdx = -1;
 
-    // Configure marked
-    marked.setOptions({
+    // Configure marked: render external links as clickable spans to bypass WKWebView link handling
+    marked.use({
       gfm: true,
       breaks: true,
+      renderer: {
+        link: function(obj) {
+          if (obj.href.startsWith('http://') || obj.href.startsWith('https://')) {
+            return '<span class="ext-link" data-href="' +
+              obj.href.replace(/"/g, '&quot;') + '">' + obj.text + '</span>';
+          }
+          return false;
+        }
+      }
+    });
+    marked.setOptions({
       highlight: function(code, lang) {
-        if (lang === 'mermaid') {
-          return code;
-        }
-        if (lang && hljs.getLanguage(lang)) {
-          return hljs.highlight(code, { language: lang }).value;
-        }
+        if (lang === 'mermaid') return code;
+        if (lang && hljs.getLanguage(lang)) return hljs.highlight(code, { language: lang }).value;
         return hljs.highlightAuto(code).value;
       }
     });
@@ -246,6 +255,7 @@
       });
       renderMermaid();
       buildToc();
+      bindExtLinks();
     };
 
     // Reload content from Zig (file watch - preserves scroll position via anchor)
@@ -280,7 +290,29 @@
       renderMermaid();
       // Rebuild TOC
       buildToc();
+      bindExtLinks();
     };
+
+    function bindExtLinks() {
+      document.querySelectorAll('#content .ext-link').forEach(function(el) {
+        if (el.dataset.bound) return;
+        el.dataset.bound = '1';
+        el.addEventListener('click', function() {
+          window.openExternal(JSON.stringify(el.getAttribute('data-href')));
+        });
+      });
+    }
+
+    // Handle anchor links via event delegation
+    document.addEventListener('click', function(e) {
+      var link = e.target.closest('a');
+      if (!link) return;
+      var href = link.getAttribute('href');
+      if (!href || !href.startsWith('#')) return;
+      e.preventDefault();
+      var el = document.getElementById(href.substring(1));
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
 
     async function renderMermaid() {
       // Find code blocks with language-mermaid

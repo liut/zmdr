@@ -50,6 +50,7 @@ pub fn main(ctx: std.process.Init) !void {
     try easy.bindFn("reloadFile", reloadFile);
     try easy.bindFn("getFilePath", getFilePath);
     try easy.bindFn("closeWindow", closeWindow);
+    try easy.bindFn("openExternal", openExternal);
 
     var title_buf: [256:0]u8 = undefined;
     const title = std.fmt.bufPrintZ(&title_buf, "mdr - {s}", .{file_path}) catch @panic("title too long");
@@ -189,6 +190,25 @@ fn reloadFile(req: Webview.Easy(Context).Request) !void {
 fn closeWindow(req: Webview.Easy(Context).Request) !void {
     req.resolve();
     global_easy.terminate() catch {};
+}
+
+fn openExternal(req: Webview.Easy(Context).Request) !void {
+    // Extract URL from JSON args, stripping any JSON escaping artifacts
+    const start = std.mem.indexOf(u8, req.args, "http") orelse {
+        req.reject("No URL found");
+        return;
+    };
+    var end: usize = start;
+    while (end < req.args.len and req.args[end] != '"' and req.args[end] != '\\') : (end += 1) {}
+    const url = req.args[start..end];
+    const argv = [_][]const u8{ "open", url };
+    const result = std.process.run(global_ctx.allocator, global_io, .{ .argv = &argv }) catch {
+        req.reject("Failed to open");
+        return;
+    };
+    global_ctx.allocator.free(result.stdout);
+    global_ctx.allocator.free(result.stderr);
+    req.resolve();
 }
 
 fn getFilePath(req: Webview.Easy(Context).Request) !void {
