@@ -80,10 +80,8 @@ pub fn main(ctx: std.process.Init) !void {
     try easy.setHtml(html_final);
 
     // Start file watcher thread
-    const file_path_dup = try allocator.dupeZ(u8, file_path);
-    const thread = std.Thread.spawn(.{}, fileWatcherThread, .{file_path_dup, allocator}) catch |err| {
+    const thread = std.Thread.spawn(.{}, fileWatcherThread, .{file_path, allocator}) catch |err| {
         std.debug.print("Failed to start file watcher: {}\n", .{err});
-        allocator.free(file_path_dup);
         return;
     };
     thread.detach();
@@ -91,7 +89,7 @@ pub fn main(ctx: std.process.Init) !void {
     try easy.run();
 }
 
-fn fileWatcherThread(file_path: [:0]u8, allocator: std.mem.Allocator) void {
+fn fileWatcherThread(file_path: []const u8, allocator: std.mem.Allocator) void {
     _ = allocator;
     // Get initial modification time
     var last_mtime = getFileMtime(file_path);
@@ -107,7 +105,7 @@ fn fileWatcherThread(file_path: [:0]u8, allocator: std.mem.Allocator) void {
     }
 }
 
-fn getFileMtime(path: [:0]u8) i96 {
+fn getFileMtime(path: []const u8) i96 {
     const dir = std.Io.Dir.cwd();
     const file = dir.openFile(global_io, path, .{}) catch return 0;
     defer file.close(global_io);
