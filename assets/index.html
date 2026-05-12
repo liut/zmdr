@@ -197,6 +197,7 @@
     <button onclick="searchNav(1)">▼</button>
     <button class="close-btn" onclick="closeSearch()">Esc</button>
   </div>
+  <input type="file" id="fileInput" accept=".md,.markdown" style="display:none" />
 
   <script>
     // Global state
@@ -428,6 +429,24 @@
         e.preventDefault();
         window.closeWindow();
       }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'o') {
+        e.preventDefault();
+        document.getElementById('fileInput').click();
+      }
+    });
+
+    // File open handler
+    document.getElementById('fileInput').addEventListener('change', function() {
+      var file = this.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function(ev) {
+        var content = ev.target.result;
+        window.zigUpdateContent(content);
+        document.title = file.name;
+        window.zigSetTitle && window.zigSetTitle(file.name);
+      };
+      reader.readAsText(file);
     });
   </script>
 </body>
