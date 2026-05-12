@@ -5,6 +5,10 @@ on:
     tags:
       - "v*"
 
+permissions:
+  security-events: write
+  pull-requests: read
+
 jobs:
   build:
     strategy:
