@@ -1,0 +1,16 @@
+.{
+    .name = .zmdr,
+    .version = "0.1.0",
+    .fingerprint = 0xda5379245d87523f,
+    .dependencies = .{
+        .webview = .{
+            .path = "deps/webview",
+        },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+        "assets",
+    },
+}
