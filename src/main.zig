@@ -49,6 +49,7 @@ pub fn main(ctx: std.process.Init) !void {
 
     try easy.bindFn("reloadFile", reloadFile);
     try easy.bindFn("getFilePath", getFilePath);
+    try easy.bindFn("closeWindow", closeWindow);
 
     var title_buf: [256:0]u8 = undefined;
     const title = std.fmt.bufPrintZ(&title_buf, "mdr - {s}", .{file_path}) catch @panic("title too long");
@@ -183,6 +184,11 @@ fn reloadFile(req: Webview.Easy(Context).Request) !void {
     const json_z = try global_ctx.allocator.dupeZ(u8, json);
     defer global_ctx.allocator.free(json_z);
     req.resolveWith(json_z);
+}
+
+fn closeWindow(req: Webview.Easy(Context).Request) !void {
+    req.resolve();
+    global_easy.terminate() catch {};
 }
 
 fn getFilePath(req: Webview.Easy(Context).Request) !void {

@@ -421,6 +421,14 @@
     document.getElementById('searchInput').addEventListener('input', function() {
       highlightMatches(this.value);
     });
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', function(e) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'w') {
+        e.preventDefault();
+        window.closeWindow();
+      }
+    });
   </script>
 </body>
 </html>
