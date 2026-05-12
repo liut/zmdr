@@ -22,7 +22,7 @@ Inspired by [mdr](https://github.com/CleverCloud/mdr), rewritten in Zig.
 ## Build
 
 ```sh
-git clone --recurse-submodules https://github.com/<user>/zmdr.git
+git clone --recurse-submodules https://github.com/liut/zmdr.git
 cd zmdr
 zig build
 ```
