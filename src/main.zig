@@ -1,5 +1,6 @@
 const std = @import("std");
 const Webview = @import("webview").Webview;
+const html_resource = @import("html_resource");
 
 const Context = struct {
     allocator: std.mem.Allocator,
@@ -11,8 +12,8 @@ var global_ctx: *Context = undefined;
 var global_io: std.Io = undefined;
 var global_easy: *Webview.Easy(Context) = undefined;
 
-// HTML content loaded at runtime (null-terminated for Webview)
-var html_content: [:0]u8 = undefined;
+// HTML content embedded at compile time
+const html_content = html_resource.html_content;
 
 pub fn main(ctx: std.process.Init) !void {
     const allocator = ctx.gpa;
@@ -35,13 +36,6 @@ pub fn main(ctx: std.process.Init) !void {
         .base_dir = base_dir,
     };
     global_ctx = &ctx_local;
-
-    // Load HTML from assets/index.html relative to executable
-    const html_alloc = try std.Io.Dir.cwd().readFileAlloc(global_io, "assets/index.html", allocator, .unlimited);
-    defer allocator.free(html_alloc);
-    // Create null-terminated version for Webview
-    html_content = try allocator.dupeZ(u8, html_alloc);
-    defer allocator.free(html_content);
 
     var easy: Webview.Easy(Context) = try .init(&ctx_local, .release);
     global_easy = &easy;

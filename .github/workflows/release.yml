@@ -43,6 +43,10 @@ jobs:
       - name: Build
         run: zig build -Doptimize=ReleaseSafe
 
+      - name: Ad-hoc codesign (macOS)
+        if: runner.os == 'macOS'
+        run: codesign --force --deep -s - zig-out/bin/zmdr
+
       - name: Package (Unix)
         if: runner.os != 'Windows'
         run: tar czf ${{ matrix.artifact }}.tar.gz -C zig-out/bin zmdr
