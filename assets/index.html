@@ -455,6 +455,9 @@
       highlightMatches(this.value);
     });
 
+    // Disable native context menu to prevent accidental reload
+    document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
+
     // Keyboard shortcuts
     document.addEventListener('keydown', function(e) {
       if ((e.metaKey || e.ctrlKey) && e.key === 'w') {
