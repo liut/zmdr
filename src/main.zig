@@ -19,7 +19,14 @@ pub fn main(ctx: std.process.Init) !void {
     const allocator = ctx.gpa;
     global_io = ctx.io;
 
-    var args = std.process.Args.iterate(ctx.minimal.args);
+    const ArgsIter = blk: {
+        if (@import("builtin").os.tag == .windows) {
+            break :blk try std.process.Args.initAllocator(ctx.minimal.args, allocator);
+        } else {
+            break :blk std.process.Args.iterate(ctx.minimal.args);
+        }
+    };
+    var args = ArgsIter;
     _ = args.next(); // skip executable path
     const file_path = args.next() orelse {
         std.debug.print("Usage: zmdr <file.md>\n", .{});
@@ -55,7 +62,11 @@ pub fn main(ctx: std.process.Init) !void {
     const initial_content = try readFileAlloc(file_path, allocator);
     defer allocator.free(initial_content);
 
-    const escaped = try escapeJson(allocator, initial_content);
+    // Inline images as data URIs
+    const inlined_content = try inlineImages(allocator, initial_content, base_dir);
+    defer allocator.free(inlined_content);
+
+    const escaped = try escapeJson(allocator, inlined_content);
     defer allocator.free(escaped);
 
     // Inject markdown into HTML before setting
@@ -203,6 +214,66 @@ fn openExternal(req: Webview.Easy(Context).Request) !void {
     global_ctx.allocator.free(result.stdout);
     global_ctx.allocator.free(result.stderr);
     req.resolve();
+}
+
+fn inlineImages(allocator: std.mem.Allocator, content: []const u8, base_dir: []const u8) ![]u8 {
+    var result = std.ArrayList(u8){ .items = &.{}, .capacity = 0 };
+    errdefer result.deinit(allocator);
+    var i: usize = 0;
+    while (i < content.len) {
+        if (i + 1 < content.len and content[i] == '!' and content[i + 1] == '[') {
+            if (try tryImg(allocator, content, &i, base_dir, &result)) continue;
+        }
+        try result.append(allocator, content[i]);
+        i += 1;
+    }
+    return result.toOwnedSlice(allocator);
+}
+
+fn tryImg(allocator: std.mem.Allocator, content: []const u8, i: *usize, base_dir: []const u8, result: *std.ArrayList(u8)) !bool {
+    const start = i.*;
+    const alt_end = std.mem.indexOfPos(u8, content, start + 2, "](") orelse return false;
+    const path_start = alt_end + 2;
+    if (path_start >= content.len) return false;
+    const path_end = std.mem.indexOfScalarPos(u8, content, path_start, ')') orelse return false;
+    const img_path = content[path_start..path_end];
+
+    // Resolve absolute path
+    const abs_path = if (std.fs.path.isAbsolute(img_path))
+        try allocator.dupe(u8, img_path)
+    else if (base_dir.len > 0)
+        try std.fs.path.resolve(allocator, &.{ base_dir, img_path })
+    else
+        img_path;
+    defer if (std.fs.path.isAbsolute(img_path) or base_dir.len > 0) allocator.free(abs_path);
+
+    // Use system base64 command
+    const b64_result = std.process.run(allocator, global_io, .{ .argv = &.{ "base64", "-i", abs_path } }) catch return false;
+    defer allocator.free(b64_result.stdout);
+    defer allocator.free(b64_result.stderr);
+    // Trim trailing newline
+    var b64_data = b64_result.stdout;
+    if (b64_data.len > 0 and b64_data[b64_data.len - 1] == '\n') b64_data.len -= 1;
+
+    // MIME type
+    const ext = std.fs.path.extension(img_path);
+    const mime = if (std.mem.eql(u8, ext, ".png")) "image/png"
+    else if (std.mem.eql(u8, ext, ".jpg") or std.mem.eql(u8, ext, ".jpeg")) "image/jpeg"
+    else if (std.mem.eql(u8, ext, ".gif")) "image/gif"
+    else if (std.mem.eql(u8, ext, ".svg")) "image/svg+xml"
+    else if (std.mem.eql(u8, ext, ".webp")) "image/webp"
+    else "image/png";
+
+    // Build data URI
+    const prefix = try std.fmt.allocPrint(allocator, "data:{s};base64,", .{mime});
+    defer allocator.free(prefix);
+
+    try result.appendSlice(allocator, content[start..path_start]); // ![...](
+    try result.appendSlice(allocator, prefix);
+    try result.appendSlice(allocator, b64_data);
+    try result.append(allocator, ')');
+    i.* = path_end + 1;
+    return true;
 }
 
 fn getFilePath(req: Webview.Easy(Context).Request) !void {
