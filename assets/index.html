@@ -5,9 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>zmdr</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.17.0/dist/katex.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.17.0/dist/katex.min.js"></script>
   <style id="markdown-styles">
     :root {
       --bg-primary: #ffffff;
@@ -142,6 +144,23 @@
     @media (prefers-color-scheme: dark) {
       .mermaid-error { background: #450a0a; border-color: #7f1d1d; color: #fca5a5; }
     }
+    .math-block { text-align: center; margin: 16px 0; overflow-x: auto; }
+    .math-block .katex { font-size: 1.1em; }
+    @media (prefers-color-scheme: dark) {
+      .math-block .katex { color: #e6edf3; }
+    }
+    .math-error {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #991b1b;
+      padding: 12px;
+      border-radius: 6px;
+      margin: 16px 0;
+    }
+    @media (prefers-color-scheme: dark) {
+      .math-error { background: #450a0a; border-color: #7f1d1d; color: #fca5a5; }
+    }
+
     .search-bar {
       position: fixed;
       bottom: 0;
@@ -244,6 +263,64 @@
       });
       renderMermaid();
     });
+
+
+    // Math formula rendering (KaTeX)
+    // Block-level extension: $$...$$ display math
+    const mathBlock = {
+      name: 'mathBlock',
+      level: 'block',
+      start(src) { return src.match(/\$\$/)?.index; },
+      tokenizer(src) {
+        const rule = /^\$\$\s*\n?([\s\S]*?)\n?\s*\$\$/;
+        const match = rule.exec(src);
+        if (match) {
+          return { type: 'mathBlock', raw: match[0], text: match[1].trim() };
+        }
+      },
+      renderer(token) {
+        if (typeof katex === 'undefined') {
+          return '<div class="math-error">KaTeX not loaded</div>';
+        }
+        if (!token.text) {
+          return '<div class="math-block"></div>';
+        }
+        try {
+          const html = katex.renderToString(token.text, { displayMode: true, throwOnError: true });
+          return '<div class="math-block">' + html + '</div>';
+        } catch (e) {
+          return '<div class="math-error">Formula error: ' + e.message + '</div>';
+        }
+      }
+    };
+
+    // Inline-level extension: $...$ inline math
+    const mathInline = {
+      name: 'mathInline',
+      level: 'inline',
+      start(src) { return src.indexOf('$'); },
+      tokenizer(src) {
+        const rule = /^\$(?!\d|\s)([^$\n]+?)\$/;
+        const match = rule.exec(src);
+        if (match) {
+          return { type: 'mathInline', raw: match[0], text: match[1].trim() };
+        }
+      },
+      renderer(token) {
+        if (typeof katex === 'undefined') {
+          return token.raw;
+        }
+        try {
+          const html = katex.renderToString(token.text, { displayMode: false, throwOnError: true });
+          return '<span class="math-inline">' + html + '</span>';
+        } catch (e) {
+          return token.raw;
+        }
+      }
+    };
+
+    // Register both math extensions
+    marked.use({ extensions: [mathBlock, mathInline] });
 
     // Update content from Zig (initial load)
     window.zigUpdateContent = function(markdown) {
