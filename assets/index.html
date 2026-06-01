@@ -285,8 +285,10 @@
         if (!token.text) {
           return '<div class="math-block"></div>';
         }
+        // Strip unsupported commands
+        const sanitized = token.text.replace(/\\label\{[^}]*\}/g, '');
         try {
-          const html = katex.renderToString(token.text, { displayMode: true, throwOnError: true });
+          const html = katex.renderToString(sanitized, { displayMode: true, throwOnError: false, strict: false });
           return '<div class="math-block">' + html + '</div>';
         } catch (e) {
           return '<div class="math-error">Formula error: ' + e.message + '</div>';
@@ -300,8 +302,14 @@
       level: 'inline',
       start(src) { return src.indexOf('$'); },
       tokenizer(src) {
-        const rule = /^\$(?!\d|\s)([^$\n]+?)\$/;
-        const match = rule.exec(src);
+        // Match formulas containing LaTeX commands (has \), regardless of $ prefix
+        let rule = /^\$(?=[^$\n]*\\)([^$\n]+?)\$/;
+        let match = rule.exec(src);
+        // Match formulas where $ not followed by currency pattern (digits + space/punct/end)
+        if (!match) {
+          rule = /^\$(?!\d+(?:\s|[.,;:!?]|$))([^$\n]+?)\$/;
+          match = rule.exec(src);
+        }
         if (match) {
           return { type: 'mathInline', raw: match[0], text: match[1].trim() };
         }
@@ -311,7 +319,7 @@
           return token.raw;
         }
         try {
-          const html = katex.renderToString(token.text, { displayMode: false, throwOnError: true });
+          const html = katex.renderToString(token.text, { displayMode: false, throwOnError: false, strict: false });
           return '<span class="math-inline">' + html + '</span>';
         } catch (e) {
           return token.raw;
@@ -532,8 +540,14 @@
       highlightMatches(this.value);
     });
 
-    // Disable native context menu to prevent accidental reload
-    document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
+    // Allow context menu only when text is selected (for Copy), block otherwise
+    document.addEventListener('contextmenu', function(e) {
+      var sel = window.getSelection();
+      if (!sel || !sel.toString()) {
+        e.preventDefault();
+      }
+    });
+
 
     // Keyboard shortcuts
     document.addEventListener('keydown', function(e) {
@@ -544,6 +558,13 @@
       if ((e.metaKey || e.ctrlKey) && e.key === 'o') {
         e.preventDefault();
         document.getElementById('fileInput').click();
+      }
+      // Cmd+C / Ctrl+C: copy current selection
+      if ((e.metaKey || e.ctrlKey) && e.key === 'c') {
+        var sel = window.getSelection();
+        if (sel && sel.toString() && !e.target.closest('input, textarea')) {
+          document.execCommand('copy');
+        }
       }
     });
 
