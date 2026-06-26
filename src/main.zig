@@ -56,7 +56,7 @@ pub fn main(ctx: std.process.Init) !void {
     var title_buf: [256:0]u8 = undefined;
     const title = std.fmt.bufPrintZ(&title_buf, "mdr - {s}", .{file_path}) catch @panic("title too long");
     try easy.setTitle(title);
-    try easy.setSize(1100, 900, .none);
+    try easy.setSize(1200, 900, .none);
 
     // Load initial markdown file content
     const initial_content = try readFileAlloc(file_path, allocator);
