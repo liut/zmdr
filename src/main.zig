@@ -21,7 +21,7 @@ pub fn main(ctx: std.process.Init) !void {
 
     const ArgsIter = blk: {
         if (@import("builtin").os.tag == .windows) {
-            break :blk try std.process.Args.initAllocator(ctx.minimal.args, allocator);
+            break :blk try std.process.Args.iterateAllocator(ctx.minimal.args, allocator);
         } else {
             break :blk std.process.Args.iterate(ctx.minimal.args);
         }
